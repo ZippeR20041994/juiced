@@ -69,6 +69,3 @@ jobs:
           name: juiced-arm64
           path: juiced-arm64.tar.gz
           retention-days: 14
-          name: juiced-arm64
-          path: juiced-arm64.tar.gz
-          retention-days: 14
