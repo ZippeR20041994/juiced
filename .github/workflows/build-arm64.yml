@@ -42,7 +42,7 @@ jobs:
             libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
             libxss-dev libxxf86vm-dev libxtst-dev libxfixes-dev \
-            libudev-dev libdbus-1-dev nasm yasm
+            libudev-dev libdbus-1-dev nasm yasm libglapi-mesa
 
           # Configure gcc-13 / g++-13 as default
           update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
@@ -101,6 +101,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DSDL_SHARED=ON \
             -DSDL_STATIC=ON \
+            -DSDL_KMSDRM=ON \
+            -DSDL_KMSDRM_SHARED=OFF \
             -DSDL_TESTS=OFF \
             -DSDL_TEST_LIBRARY=OFF \
             -DSDL_EXAMPLES=OFF \
@@ -142,8 +144,8 @@ jobs:
           cp -a /usr/local/lib/libavutil*.so* package/lib/ 2>/dev/null || true
           cp -a /usr/local/lib/libswresample*.so* package/lib/ 2>/dev/null || true
 
-          # Copy gdk-pixbuf and glib dependencies from Ubuntu 20.04
-          for lib in libgdk_pixbuf-2.0 libglib-2.0 libgobject-2.0 libgio-2.0 libgmodule-2.0 libffi libpcre; do
+          # Copy runtime dependencies from Ubuntu 20.04
+          for lib in libgdk_pixbuf-2.0 libglib-2.0 libgobject-2.0 libgio-2.0 libgmodule-2.0 libffi libpcre libgbm libdrm libwayland-server libexpat libglapi libmount libblkid libselinux; do
             find /usr/lib/aarch64-linux-gnu -name "${lib}*.so*" -exec cp -a {} package/lib/ \; 2>/dev/null || true
           done
 
