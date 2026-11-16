@@ -4,25 +4,29 @@ on:
   push:
     branches: [ main, master ]
 jobs:
-  build-native-arm64:
-    name: Build on Native ARM64 Runner
-    runs-on: ubuntu-24.04-arm
-    continue-on-error: true
+  build-arm64:
+    name: Build Juiced ARM64 Linux
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout OpenJuice Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
-      - name: Install System Dependencies
+      - name: Set up QEMU for ARM64
+        uses: docker/setup-qemu-action@v3
+      - name: Create Build Script
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build pkg-config git \
+          cat << 'EOF' > run_build.sh
+          #!/bin/bash
+          set -ex
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config git ca-certificates \
             liblua5.4-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
             libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
             libgdk-pixbuf-2.0-dev libasound2-dev libpulse-dev libx11-dev \
             libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev
-      - name: Build and Install SDL3 from Source
-        run: |
+          echo "=== Building SDL3 ==="
           git clone --depth 1 https://github.com/libsdl-org/SDL.git -b main
           cd SDL
           cmake -B build -G Ninja \
@@ -31,63 +35,23 @@ jobs:
             -DSDL_STATIC=ON \
             -DSDL_TEST_LIBRARY=OFF
           cmake --build build -j$(nproc)
-          sudo cmake --install build
+          cmake --install build
           cd ..
-      - name: Configure and Build Juiced
-        run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          echo "=== Building Juiced ==="
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF
           cmake --build build --target juiced -j$(nproc)
           strip build/juiced
-      - name: Verify Architecture
-        run: |
-          file build/juiced
-      - name: Archive Binary
-        run: |
           tar -czvf juiced-arm64.tar.gz -C build juiced
+          EOF
+          chmod +x run_build.sh
+      - name: Run Build inside Ubuntu 24.04 ARM64 Container
+        run: |
+          docker run --rm --platform linux/arm64 -v "${{ github.workspace }}:/workspace" -w /workspace ubuntu:24.04 ./run_build.sh
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: juiced-arm64-native
+          name: juiced-arm64
           path: juiced-arm64.tar.gz
-          retention-days: 14
-  build-qemu-arm64:
-    name: Build on QEMU ARM64 (Fallback)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      - name: Build inside ARM64 Container
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: aarch64
-          distro: ubuntu24.04
-          githubToken: ${{ github.token }}
-          setup: |
-            mkdir -p "${PWD}/artifacts"
-          install: |
-            apt-get update
-            apt-get install -y --no-install-recommends \
-              build-essential cmake ninja-build pkg-config git ca-certificates \
-              liblua5.4-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
-              libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
-              libgdk-pixbuf-2.0-dev libasound2-dev libpulse-dev libx11-dev \
-              libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
-              libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev
-          run: |
-            git clone --depth 1 https://github.com/libsdl-org/SDL.git -b main
-            cd SDL
-            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF
-            cmake --build build -j$(nproc)
-            cmake --install build
-            cd ..
-            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-            cmake --build build --target juiced -j$(nproc)
-            strip build/juiced
-            file build/juiced
-            tar -czvf artifacts/juiced-arm64-qemu.tar.gz -C build juiced
-      - name: Upload Artifact (QEMU)
-        uses: actions/upload-artifact@v4
-        with:
-          name: juiced-arm64-qemu
-          path: artifacts/juiced-arm64-qemu.tar.gz
           retention-days: 14
