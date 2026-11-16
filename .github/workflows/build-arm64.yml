@@ -102,7 +102,6 @@ jobs:
             -DSDL_SHARED=ON \
             -DSDL_STATIC=ON \
             -DSDL_KMSDRM=ON \
-            -DSDL_KMSDRM_SHARED=OFF \
             -DSDL_TESTS=OFF \
             -DSDL_TEST_LIBRARY=OFF \
             -DSDL_EXAMPLES=OFF \
