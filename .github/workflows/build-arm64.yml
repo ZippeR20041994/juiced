@@ -18,7 +18,10 @@ jobs:
           #!/bin/bash
           set -ex
           export DEBIAN_FRONTEND=noninteractive
+          # Enable deb-src and update
+          sed -i 's/Types: deb/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources || true
           apt-get update
+          # Install all build dependencies
           apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config git ca-certificates \
             liblua5.4-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
@@ -26,7 +29,8 @@ jobs:
             libgdk-pixbuf-2.0-dev libasound2-dev libpulse-dev libx11-dev \
             libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
-            libxss-dev libxxf86vm-dev
+            libxss-dev libxxf86vm-dev libxtst-dev libxfixes-dev libxrandr-dev \
+            libudev-dev libdbus-1-dev
           echo "=== Building SDL3 ==="
           git clone --depth 1 https://github.com/libsdl-org/SDL.git -b main
           cd SDL
@@ -37,7 +41,8 @@ jobs:
             -DSDL_TESTS=OFF \
             -DSDL_TEST_LIBRARY=OFF \
             -DSDL_EXAMPLES=OFF \
-            -DSDL_X11_XSCRNSAVER=OFF
+            -DSDL_X11_XSCRNSAVER=OFF \
+            -DSDL_X11_XTEST=OFF
           cmake --build build -j$(nproc)
           cmake --install build
           cd ..
