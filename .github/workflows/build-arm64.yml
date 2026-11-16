@@ -23,19 +23,64 @@ jobs:
           # Allow git inside container
           git config --global --add safe.directory /workspace || true
           git submodule update --init --recursive || true
-          # Enable deb-src and update
-          sed -i 's/Types: deb/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources || true
+          # Update and install build dependencies
           apt-get update
-          # Install all build dependencies
           apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build pkg-config git ca-certificates \
-            liblua5.4-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
-            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
-            libgdk-pixbuf-2.0-dev libasound2-dev libpulse-dev libx11-dev \
+            build-essential ninja-build pkg-config git ca-certificates curl \
+            gcc-10 g++-10 \
+            python3 python3-pip python3-setuptools \
+            libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libgdk-pixbuf2.0-dev libasound2-dev libpulse-dev libx11-dev \
             libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
-            libxss-dev libxxf86vm-dev libxtst-dev libxfixes-dev libxrandr-dev \
-            libudev-dev libdbus-1-dev
+            libxss-dev libxxf86vm-dev libxtst-dev libxfixes-dev \
+            libudev-dev libdbus-1-dev nasm yasm
+          # Configure gcc-10 / g++-10 as default
+          update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 --slave /usr/bin/g++ g++ /usr/bin/g++-10
+          export CC=gcc-10
+          export CXX=g++-10
+          # Install modern CMake (Ubuntu 20.04 default is 3.16, we need >= 3.24)
+          pip3 install --upgrade cmake ninja
+          # 1. Build & Install Lua 5.4
+          echo "=== Building Lua 5.4 ==="
+          curl -L -O https://www.lua.org/ftp/lua-5.4.7.tar.gz
+          tar zxf lua-5.4.7.tar.gz
+          cd lua-5.4.7
+          make linux MYCFLAGS="-fPIC" -j$(nproc)
+          make install
+          # Build shared liblua5.4.so for runtime
+          gcc-10 -shared -o /usr/local/lib/liblua5.4.so.0 src/*.o
+          ln -sf /usr/local/lib/liblua5.4.so.0 /usr/local/lib/liblua5.4.so
+          ln -sf /usr/local/lib/liblua5.4.so.0 /usr/local/lib/liblua.so
+          # Set up header directories for CMake FindLua
+          mkdir -p /usr/local/include/lua5.4 /usr/local/include/lua54
+          cp /usr/local/include/lua*.h /usr/local/include/lua5.4/
+          cp /usr/local/include/lua*.h /usr/local/include/lua54/
+          cd ..
+          # 2. Build Minimal FFmpeg 6.1 (Clean audio decoders, no bloated external dependencies)
+          echo "=== Building Minimal FFmpeg ==="
+          git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git -b release/6.1 ffmpeg
+          cd ffmpeg
+          ./configure \
+            --prefix=/usr/local \
+            --enable-shared \
+            --enable-static \
+            --disable-programs \
+            --disable-doc \
+            --disable-everything \
+            --enable-avformat \
+            --enable-avcodec \
+            --enable-avutil \
+            --enable-swresample \
+            --enable-decoder=pcm_s16le,pcm_s16be,pcm_u8,pcm_s24le,pcm_s32le,adpcm_ima_wav,adpcm_ms,mp3,mp3float,vorbis,flac,aac \
+            --enable-demuxer=wav,mp3,ogg,flac,aac,pcm_s16le \
+            --enable-parser=mpegaudio,aac,vorbis,flac \
+            --enable-protocol=file \
+            --disable-autodetect
+          make -j$(nproc)
+          make install
+          cd ..
+          # 3. Build SDL3
           echo "=== Building SDL3 ==="
           git clone --depth 1 https://github.com/libsdl-org/SDL.git -b main
           cd SDL
@@ -51,18 +96,41 @@ jobs:
           cmake --build build -j$(nproc)
           cmake --install build
           cd ..
+          # Set PKG_CONFIG_PATH
+          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH}
+          ldconfig
+          # 4. Build Juiced
           echo "=== Building Juiced ==="
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
           cmake --build build --target juiced -j$(nproc)
           strip build/juiced
-          tar -czvf juiced-arm64.tar.gz -C build juiced
+          # 5. Assemble Distribution Package
+          echo "=== Packaging Distribution ==="
+          mkdir -p package/lib
+          cp build/juiced package/
+          # Copy SDL3
+          cp -P /usr/local/lib/libSDL3.so* package/lib/ 2>/dev/null || true
+          # Copy Lua 5.4
+          cp -P /usr/local/lib/liblua5.4.so* package/lib/ 2>/dev/null || true
+          # Copy FFmpeg libraries
+          cp -P /usr/local/lib/libavformat.so* package/lib/ 2>/dev/null || true
+          cp -P /usr/local/lib/libavcodec.so* package/lib/ 2>/dev/null || true
+          cp -P /usr/local/lib/libavutil.so* package/lib/ 2>/dev/null || true
+          cp -P /usr/local/lib/libswresample.so* package/lib/ 2>/dev/null || true
+          # Copy gdk-pixbuf and glib dependencies from Ubuntu 20.04
+          for lib in libgdk_pixbuf-2.0.so.0 libglib-2.0.so.0 libgobject-2.0.so.0 libgio-2.0.so.0 libgmodule-2.0.so.0 libffi.so.7; do
+            find /usr/lib/aarch64-linux-gnu -name "${lib}*" -exec cp -P {} package/lib/ \; 2>/dev/null || true
+          done
+          tar -czvf juiced-arm64.tar.gz -C package .
           EOF
           chmod +x run_build.sh
-      - name: Run Build inside Ubuntu 24.04 ARM64 Container
+      - name: Run Build inside Ubuntu 20.04 ARM64 Container
         run: |
-          docker run --rm --platform linux/arm64 -v "${{ github.workspace }}:/workspace" -w /workspace ubuntu:24.04 ./run_build.sh
+          docker run --rm --platform linux/arm64 -v "${{ github.workspace }}:/workspace" -w /workspace ubuntu:20.04 ./run_build.sh
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
