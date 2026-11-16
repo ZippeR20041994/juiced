@@ -58,7 +58,7 @@ jobs:
           make linux MYCFLAGS="-fPIC" -j$(nproc)
           make install
           # Build shared liblua5.4.so for runtime
-          gcc-10 -shared -o /usr/local/lib/liblua5.4.so.0 src/*.o
+          gcc-10 -shared -o /usr/local/lib/liblua5.4.so.0 -Wl,--whole-archive /usr/local/lib/liblua.a -Wl,--no-whole-archive
           ln -sf /usr/local/lib/liblua5.4.so.0 /usr/local/lib/liblua5.4.so
           ln -sf /usr/local/lib/liblua5.4.so.0 /usr/local/lib/liblua.so
           # Set up header directories for CMake FindLua
