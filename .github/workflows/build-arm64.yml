@@ -120,8 +120,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF \
             -DCMAKE_PREFIX_PATH=/usr/local \
-            -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
+            -DCMAKE_CXX_FLAGS="-static-libstdc++ -static-libgcc -pthread" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc -pthread -ldl"
           cmake --build build --target juiced -j$(nproc)
           strip build/juiced
 
