@@ -36,7 +36,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential ninja-build pkg-config git \
-            gcc-11 g++-11 \
+            gcc-13 g++-13 \
             libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
             libgdk-pixbuf2.0-dev libasound2-dev libpulse-dev libx11-dev \
             libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
@@ -44,10 +44,10 @@ jobs:
             libxss-dev libxxf86vm-dev libxtst-dev libxfixes-dev \
             libudev-dev libdbus-1-dev nasm yasm
 
-          # Configure gcc-11 / g++-11 as default
-          update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11
-          export CC=gcc-11
-          export CXX=g++-11
+          # Configure gcc-13 / g++-13 as default
+          update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+          export CC=gcc-13
+          export CXX=g++-13
 
           # Install modern CMake (Ubuntu 20.04 default is 3.16, we need >= 3.24)
           curl -sSL https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-aarch64.tar.gz | tar -xz --strip-components=1 -C /usr/local || pip3 install --upgrade cmake ninja
@@ -60,7 +60,7 @@ jobs:
           make linux MYCFLAGS="-fPIC" -j$(nproc)
           make install
           # Build shared liblua5.4.so for runtime
-          gcc-11 -shared -o /usr/local/lib/liblua5.4.so.0 -Wl,--whole-archive /usr/local/lib/liblua.a -Wl,--no-whole-archive
+          gcc-13 -shared -o /usr/local/lib/liblua5.4.so.0 -Wl,--whole-archive /usr/local/lib/liblua.a -Wl,--no-whole-archive
           ln -sf /usr/local/lib/liblua5.4.so.0 /usr/local/lib/liblua5.4.so
           ln -sf /usr/local/lib/liblua5.4.so.0 /usr/local/lib/liblua.so
           # Set up header directories for CMake FindLua
