@@ -51,7 +51,7 @@ bool runConfigurationTool(bool) {
 Settings Settings::defaults(const LaunchOptions &options) {
     Settings s;
     s.width = 1280;
-    s.height = 960;
+    s.height = 720;
     s.depth = 32;
     s.antialiasing = 0;
     s.shaders = 3;
@@ -85,7 +85,7 @@ void readSettings(Settings &s) {
     auto path = dir / "settings.ini";
     std::ifstream in(path);
     if (!in) {
-        std::ofstream(path) << "width=1280\nheight=960\n";
+        std::ofstream(path) << "width=1280\nheight=720\n";
         return;
     }
     std::string line;
@@ -110,13 +110,20 @@ bool Platform::start(const char *title, const LaunchOptions &options, Settings &
         return false;
     }
     #ifdef OJ_LINUX
+    #if defined(__aarch64__) || defined(__arm__)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    auto flags = SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL;
+    #else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    auto flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL;
+    #endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    auto flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL;
 #else
     auto flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_METAL;
 #endif
