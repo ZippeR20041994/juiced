@@ -25,7 +25,8 @@ jobs:
             libavformat-dev libavcodec-dev libavutil-dev libswresample-dev \
             libgdk-pixbuf-2.0-dev libasound2-dev libpulse-dev libx11-dev \
             libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev \
-            libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev
+            libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libxss-dev libxxf86vm-dev
           echo "=== Building SDL3 ==="
           git clone --depth 1 https://github.com/libsdl-org/SDL.git -b main
           cd SDL
@@ -33,7 +34,10 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DSDL_SHARED=ON \
             -DSDL_STATIC=ON \
-            -DSDL_TEST_LIBRARY=OFF
+            -DSDL_TESTS=OFF \
+            -DSDL_TEST_LIBRARY=OFF \
+            -DSDL_EXAMPLES=OFF \
+            -DSDL_X11_XSCRNSAVER=OFF
           cmake --build build -j$(nproc)
           cmake --install build
           cd ..
